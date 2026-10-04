@@ -7,8 +7,8 @@ LibraSys is a web-based library management system for one library branch. It man
 The application stack is:
 
 - **Database:** MySQL 8.x using InnoDB
-- **Backend:** ASP.NET 8 Core Web API
-- **Frontend:** Vanilla HTML, CSS, and JavaScript
+- **Application:** PHP 8.3+ server-rendered pages with PDO for MySQL access
+- **Browser layer:** HTML and CSS rendered by PHP, with JavaScript used only for progressive enhancement where useful
 
 The database portion demonstrates the course topics at an appropriate project scale:
 
@@ -46,7 +46,7 @@ The project demonstrates these topics with executable SQL, controlled test cases
 
 ## 3. Roles and authorization boundary
 
-Application roles are **Guest**, **Member**, **Librarian**, and **DBA**. Application authorization is enforced by ASP.NET authentication and authorization policies. These roles are not a substitute for MySQL accounts.
+Application roles are **Guest**, **Member**, **Librarian**, and **DBA**. Application authorization is enforced by PHP sessions, request guards, and authorization checks. These roles are not a substitute for MySQL accounts.
 
 | Actor | Application access |
 |---|---|
@@ -55,7 +55,7 @@ Application roles are **Guest**, **Member**, **Librarian**, and **DBA**. Applica
 | Librarian | Manage books, copies, members, loans, reservations, fines, payments, and reports |
 | DBA | Database administration and security configuration; not an ordinary library operator |
 
-The API does not connect as a different MySQL account for every member. It uses a restricted application account. MySQL administrative accounts are used only for controlled database administration and demonstrations.
+The PHP application does not connect as a different MySQL account for every member. It uses a restricted application account. MySQL administrative accounts are used only for controlled database administration and demonstrations.
 
 ## 4. Relational design
 
@@ -92,7 +92,7 @@ Multiple authors are supported through `authors` and `book_authors` instead of a
 
 ## 5. Transaction management and recovery
 
-All business tables use InnoDB. The API uses an explicit transaction for each workflow that changes more than one related record. A transaction is committed only when every required change succeeds; otherwise it is rolled back and an error is returned.
+All business tables use InnoDB. Each PHP request handler uses an explicit transaction for a workflow that changes more than one related record. A transaction is committed only when every required change succeeds; otherwise it is rolled back and the page displays an error.
 
 ### Borrow transaction
 
@@ -106,7 +106,7 @@ All business tables use InnoDB. The API uses an explicit transaction for each wo
 8. Insert an audit log row.
 9. Commit.
 
-If any step fails, roll back all changes. The API returns a conflict for an unavailable copy rather than silently selecting another copy.
+If any step fails, roll back all changes. The PHP request handler displays a conflict for an unavailable copy rather than silently selecting another copy.
 
 ### Return transaction
 
@@ -139,7 +139,7 @@ The project demonstrates:
 - Consistent results when two sessions attempt to borrow the same copy
 - The selected MySQL isolation level and row-lock behavior
 - Foreign-key and check-constraint failures
-- Deadlock handling with a bounded retry in the API
+- Deadlock handling with a bounded retry in the PHP request handler
 
 The project documents that transaction retries must be idempotent and must not create duplicate loans, fines, payments, or audit events. Recovery coverage is limited to rollback and restore procedures appropriate for the course project. A full production RPO/RTO program is out of scope.
 
@@ -147,8 +147,8 @@ The project documents that transaction retries must be idempotent and must not c
 
 The project distinguishes hashing, transport encryption, at-rest protection, and column protection:
 
-- Passwords use a slow password-hashing library in ASP.NET 8, such as the framework password hasher. They are not reversible-encrypted.
-- API-to-MySQL connections use TLS in deployed environments.
+- Passwords use PHP's `password_hash()` and `password_verify()` with a slow password-hashing algorithm such as Argon2id or bcrypt. They are not reversibly encrypted.
+- PHP-to-MySQL connections use TLS in deployed environments.
 - Sensitive member fields, particularly address/contact information, are protected as encrypted application data or with a documented MySQL encryption function.
 - Encryption keys are supplied through environment configuration or a secret store and are never committed to source control or stored in the same database table as ciphertext.
 - Development keys are separate from deployment keys. Key rotation and loss-of-key behavior are documented.
@@ -162,7 +162,7 @@ The database security design uses least privilege:
 
 | MySQL identity | Privileges |
 |---|---|
-| `libra_api` | Required CRUD access or approved procedures/views only; no grant administration |
+| `libra_web` | Required CRUD access or approved procedures/views only; no grant administration |
 | `libra_report` | Read-only access to reporting views |
 | `libra_migration` | Temporary schema-change access during deployment |
 | `libra_audit` | Restricted audit insertion/read access if a separate service is used |
@@ -173,11 +173,11 @@ The project demonstrates MySQL roles and privileges with the selected MySQL vers
 - Create roles and users.
 - `GRANT` only the required privileges.
 - Use `REVOKE` and verify the resulting access.
-- Demonstrate `WITH GRANT OPTION` only in an isolated teaching database, never for the API account.
+- Demonstrate `WITH GRANT OPTION` only in an isolated teaching database, never for the PHP application account.
 - Demonstrate privilege inheritance and any cascading revoke behavior using version-correct SQL.
 - Grant reporting users access to views rather than sensitive base tables.
 
-Application permissions remain in `roles`, `permissions`, and `role_permissions`. MySQL grants protect the database boundary; they do not implement member ownership rules by themselves. The API must enforce that a member can read only the member's own history, fines, and profile. Negative tests include a member requesting another member's data, a librarian attempting DBA operations, and the API account attempting to grant privileges.
+Application permissions remain in `roles`, `permissions`, and `role_permissions`. MySQL grants protect the database boundary; they do not implement member ownership rules by themselves. PHP request handlers must enforce that a member can read only the member's own history, fines, and profile. Negative tests include a member requesting another member's data, a librarian attempting DBA operations, and the PHP application account attempting to grant privileges.
 
 ## 8. Query optimization
 
@@ -211,23 +211,23 @@ The project demonstrates query optimization using:
 4. The execution plan after the change.
 5. Before-and-after execution time and rows examined.
 
-The API uses parameterized queries through the selected MySQL EF Core provider or another approved data-access library. Catalog and report endpoints use pagination. The project avoids loading entire tables, unbounded result sets, and non-sargable predicates where a practical alternative exists. The report records the dataset, hardware/environment, repeated-run method, and limitations of the measurement.
+PHP request handlers use parameterized queries through PDO and MySQL prepared statements. Catalog and report pages use pagination. The project avoids loading entire tables, unbounded result sets, and non-sargable predicates where a practical alternative exists. The report records the dataset, hardware/environment, repeated-run method, and limitations of the measurement.
 
-## 9. API and UI requirements
+## 9. Server-rendered page and UI requirements
 
-The API exposes authenticated endpoints for members and librarians and public read-only catalog endpoints. Every protected endpoint has an authorization policy and validates resource ownership.
+PHP exposes public and authenticated server-rendered pages for guests, members, and librarians. Every protected page and form handler checks the current session, authorization role, and resource ownership.
 
-Required workflow endpoints include:
+Required workflow pages and form handlers include:
 
-- Catalog search and book details
-- Member profile and own history
-- Librarian book/copy/member management
-- Borrow, return, and reserve
-- Fine and payment operations
-- Reports
-- Audit/security administration where permitted
+- Catalog search and book details pages
+- Member profile and own history pages
+- Librarian book/copy/member management pages
+- Borrow, return, and reserve form handlers
+- Fine and payment pages and form handlers
+- Report pages
+- Audit/security administration pages where permitted
 
-The vanilla frontend provides separate guest, member, librarian, and DBA-facing views as appropriate. It displays validation failures, conflict responses, failed authorization, transaction errors, and payment/fine status without exposing stack traces or sensitive data.
+PHP renders separate guest, member, librarian, and DBA-facing views as appropriate. Pages display validation failures, unavailable-copy conflicts, failed authorization, transaction errors, and payment/fine status without exposing stack traces or sensitive data.
 
 ## 10. Testing and evidence
 
@@ -240,7 +240,7 @@ The submission includes:
 - Encryption demonstration without committing secrets
 - MySQL role/privilege scripts and negative-access results
 - Query plans and tuning comparison tables
-- ASP.NET endpoint authorization tests
+- PHP session, page-authorization, and form-handler tests
 - Validation of duplicate borrowing, duplicate reservations, overpayment, invalid status changes, and unauthorized data access
 
 ## 11. Completion criteria
@@ -254,4 +254,4 @@ The project is complete when each database topic has an executable demonstration
 | Authorization | Roles, grants, revokes, view/procedure boundary, and denied-access tests |
 | Query optimization | Representative query, index/plan analysis, tuning change, and measured comparison |
 
-This scope is sufficient for a course-level database project while remaining implementable with MySQL, ASP.NET 8 Core Web API, and a vanilla frontend.
+This scope is sufficient for a course-level database project while remaining implementable with MySQL, PHP 8.3+ server-rendered pages, PDO, and a browser-based UI.
