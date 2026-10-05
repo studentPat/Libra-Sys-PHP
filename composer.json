@@ -1,0 +1,29 @@
+{
+    "name": "studentpat/libra-sys-php",
+    "description": "Server-rendered PHP foundation for LibraSys",
+    "type": "project",
+    "require": {
+        "php": "^8.3"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "LibraSys\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "LibraSys\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "migrate": "php bin/migrate.php",
+        "seed": "php bin/seed.php"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
