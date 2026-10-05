@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use LibraSys\Config\Env;
 use LibraSys\Config\DatabaseConfig;
 use LibraSys\Database\Database;
 use LibraSys\Http\Router;
@@ -12,7 +11,7 @@ require dirname(__DIR__) . '/vendor/autoload.php';
 
 $root = dirname(__DIR__);
 try {
-    $env = Env::load($root . DIRECTORY_SEPARATOR . '.env');
+    $databaseConfig = DatabaseConfig::fromEnvFile($root . DIRECTORY_SEPARATOR . '.env');
     $renderer = new Renderer($root . DIRECTORY_SEPARATOR . 'templates');
     $router = new Router();
 
@@ -20,9 +19,9 @@ try {
         'title' => 'LibraSys',
     ]));
 
-    $router->get('/health/database', static function () use ($env, $renderer): string {
+    $router->get('/health/database', static function () use ($databaseConfig, $renderer): string {
         try {
-            $pdo = Database::connect(DatabaseConfig::fromEnvironment($env));
+            $pdo = Database::connect($databaseConfig);
             Database::ping($pdo);
 
             return $renderer->render('health/database', [

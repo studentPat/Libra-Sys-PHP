@@ -36,10 +36,10 @@ final class Database
         ];
     }
 
-    public static function ping(PDO $pdo): void
+    public static function ping(PDO $pdo): int
     {
         $statement = $pdo->prepare('SELECT 1');
         $statement->execute();
-        $statement->fetchColumn();
+        return (int) $statement->fetchColumn();
     }
 }

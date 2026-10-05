@@ -6,6 +6,12 @@ namespace LibraSys\Config;
 
 final class DatabaseConfig
 {
+    /** @return array<string, string> */
+    public static function fromEnvFile(string $path, string $prefix = 'DB_'): array
+    {
+        return self::fromEnvironment(Env::load($path), $prefix);
+    }
+
     /**
      * @return array<string, string>
      */

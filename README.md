@@ -20,7 +20,9 @@ catalog, member, borrowing, and reporting workflows.
    composer install
    ```
 
-3. Copy `.env.example` to `.env` and set the local database values.
+3. Copy `.env.example` to `.env` and set the local database values. For the
+   first two commands, use the migration account documented below; switch the
+   file to the restricted web account afterward.
 4. Apply the schema and deterministic seed data:
 
    ```text
